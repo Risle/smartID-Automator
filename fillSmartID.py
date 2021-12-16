@@ -15,6 +15,7 @@ from selenium.webdriver.chrome.options import Options
 #import random
 import time
 import login
+from getRowFromExcel import itemInfo
 
 chrome_options = Options()
 chrome_options.add_experimental_option("detach", True)
@@ -38,8 +39,8 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     user = login.user
     pwd = login.pwd
     def addCode(f):
-        qrcode = 'f3tq'
-        date = '2021-11-07'
+        qrcode = itemInfo['qrcode']
+        date = itemInfo['date']
         f(qrcode, date)
 
     def goForward(code, date):
@@ -66,28 +67,45 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     
     def createProdDict(code):
         prodDict = {}
-        if code == driver.find_element(By.ID, 'id').text:
+        #print([driver.find_element(By.ID, 'id').get_attribute('innerHTML'), code, bool(driver.find_element(By.ID, 'id').get_attribute('innerHTML') == code)])
+        print(driver.find_element(By.ID, 'id').text)
+        #print(driver.find_element(By.ID, 'id').value)
+        #print(driver.find_element(By.ID, 'id').get_property('attributes'))
+        if code == driver.find_element(By.ID, 'id').get_attribute('innerHTML').lower():
+
             prodDict['qrcode'] = code
             prodDict['description'] = wait.until(EC.presence_of_element_located((By.ID, 'name'))).text or 'no description'
-            prodDict['company'] = wait.until(EC.presence_of_element_located((By.ID, 'company_id'))).text
-            prodDict['location'] = driver.find_element(By.ID, 'location_id').text
-            prodDict['department'] = driver.find_element(By.ID, 'department_id').text
-            prodDict['type'] = driver.find_element(By.ID, 'type_id').text
+            prodDict['company'] = wait.until(EC.presence_of_element_located((By.ID, 'company_id'))).text or 'no company'
+            prodDict['location'] = driver.find_element(By.ID, 'location_id').text or 'no location'
+            prodDict['department'] = driver.find_element(By.ID, 'department_id').text or 'no department'
+            prodDict['type'] = driver.find_element(By.ID, 'type_id').text or 'no type'
+            successLog.append([code, ' found'])
+            
         else:
             #print(driver.wait.until(EC.presence_of_element_located((By.ID, 'id'))).text + ' was found instead')
-            errorLog.append('QR code ' + code + ' not found', code)
+            errorLog.append([code, ' not found'])
         prodList.append(prodDict)
         #return prodDict
 
     def addToScanLog(date, code):
-        driver.find_element(By.ID, 'btn_scan_log').click()
-        elDate = wait.until(EC.presence_of_element_located((By.ID, 'date')))
-        elDate.click()
-        elDate.clear()
-        elDate.send_keys(date + Keys.ENTER)
-        elDate.submit()
-        #wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, 'Update Scan Results'))).click()
-        checkScanDate(date, code)
+        dateTable = driver.find_element(By.ID, 'tbl_scan')
+        dateText = dateTable.find_element_by_css_selector('span.edit-scan-date').get_attribute('innerHTML') or ''
+        if dateText >= date:
+            successLog.append([code, 'already has scan date recorded', dateText])
+            datesScanned.append({
+                'qrcode': code,
+                'scanDate': dateText
+                })
+            #goForward(code,date)
+        else:
+            driver.find_element(By.ID, 'btn_scan_log').click()
+            elDate = wait.until(EC.presence_of_element_located((By.ID, 'date')))
+            elDate.click()
+            elDate.clear()
+            elDate.send_keys(date + Keys.ENTER)
+            elDate.submit()
+            #wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, 'Update Scan Results'))).click()
+            checkScanDate(date, code)
     
     def checkScanDate(date, code):
         #time.sleep(1)
@@ -107,14 +125,14 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
         #     #print(elDate.get_property('attributes'))
         #     #print(date)
         #     scanDates.append(elDate.get_attribute('innerHTML'))
-        if dateText == date:
+        if dateText >= date:
             print('new scan date ' + dateText + ' added for ' + code)
-            successLog.append(code)
+            successLog.append([code, 'has new scan date recorded', dateText])
             datesScanned.append({
                 'qrcode': code,
                 'scanDate': dateText
                 })
-        elif dateText:
+        elif dateText < date:
             print('new scan date not added. Last scan was' + dateText)
             errorLog.append([code, 'Date not added; last date = ' + dateText])
         else:
