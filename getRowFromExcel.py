@@ -12,13 +12,13 @@ import login
 counter = 0
 itemInfo = {}
 
-def getData():
-    pathToExcel = login.pathToData
-    data = pd.read_excel (pathToExcel)
-    url = login.url
+def getData(url, row, dataPath):
+    #dataPath = login.pathToData
+    data = pd.read_excel (dataPath)
+    #url = login.url
     #getDateColumn(pathToExcel, columnLabel) 
-    iterator(processInfo, data, url, counter)
-    #processInfo(data, url, row)
+    #iterator(processInfo, data, url, counter)
+    return processInfo(data, url, row)
     
 def getItemInfo(data, row):
     thisRow = data.iloc[row]
@@ -46,22 +46,24 @@ def findDate(data, row):
     #print(str(pd.Timestamp.date(getItemInfo(data, row)[0])))
     return str(pd.Timestamp.date(getItemInfo(data, row)[0]))
 
-def iterator(f, data, url, row):
-    f(data, url, row) 
-    global counter
-    counter += 1
+# def iterator(f, data, url, row):
+#     f(data, url, row) 
+#     global counter
+#     counter += 1
 
 def processInfo(data, url, row):
-    info = {
+    info = ({
         'qrcode': getItemInfo(data, row)[3].lower(),
         'location': getItemInfo(data, row)[1].upper(),
         'department': getItemInfo(data, row)[2],
         'url': appendToUrl(data, row, url),
         'date': findDate(data, row),
         'lookup': getItemInfo(data, row)[4]
-        }
+        })
     itemInfo.update(info)
+    return info
     
 
-getData()
+#getData(login.url, 1, login.dataPath)
+#getData(login.url, 2, login.dataPath)
 #print(itemInfo)

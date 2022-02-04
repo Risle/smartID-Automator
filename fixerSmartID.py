@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Spyder Editor
@@ -63,7 +64,6 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     rowInitial = login.rows[0]-2
     rowFinal = login.rows[1]
     date = login.date
-    #healthSystem = login.healthSystem
             
     def getQRCodes(dataPath, rowStart, rowEnd):
         #TODO Figure out which log recording is the one actually working
@@ -99,7 +99,6 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 print(code + ', not found')
         except TimeoutException:
             print(code + ', not found; timeout exception')
-            #getQRCodes(dataPath, row+1, rowFinal)
             errorLog.append([code, ', not found; timeout exception'])
             
 
@@ -113,8 +112,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
         elPwd.send_keys(pwd + Keys.RETURN)
         getQRCodes(dataPath, rowInitial, rowFinal)
         
-            
-            
+    
     def createProdDict(code, row):
         prodDict = {}
         #print([driver.find_element(By.ID, 'id').get_attribute('innerHTML'), code, bool(driver.find_element(By.ID, 'id').get_attribute('innerHTML') == code)])
@@ -129,14 +127,19 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             prodDict['department'] = driver.find_element(By.ID, 'department_id').text or 'no department'
             prodDict['type'] = driver.find_element(By.ID, 'type_id').text or 'no type'
             successLog.append([code, ' found'])
+            checkProdDetails(prodDict)
             
         else:
             print(code + ', not found by createProdDict')
             #print(driver.wait.until(EC.presence_of_element_located((By.ID, 'id'))).text + ' was found instead')
             errorLog.append([code, ', not found'])
         prodList.append(prodDict)
-        #return prodDict
+        
 
+    def checkProdDetails(product):
+        
+        
+        
     def addScanDate(date, code):    
         try:
             dateTable = driver.find_element(By.ID, 'tbl_scan') or ''
@@ -146,6 +149,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 print(code + ', already has scan date recorded, ' + dateText)
                 successLog.append([code, ', already has scan date recorded for, ' + dateText])
                 datesScanned.append([code, ', already has recent scan recorded for, ' + dateText])
+                #goForward(code,date)
             else:
                 print(code + ', is having scan date added')
                 driver.find_element(By.ID, 'btn_scan_log').click()
@@ -157,6 +161,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 #wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, 'Update Scan Results'))).click()
                 checkScanDate(date, code)
         except NoSuchElementException:
+            checkProdDetails()
             print(code + ', does not have a scan log')
             errorLog.append([code, ', does not have a scan log'])
     
