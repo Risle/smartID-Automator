@@ -63,8 +63,10 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     rowInitial = login.rows[0]-2
     rowFinal = login.rows[1]
     date = login.date
-    #healthSystem = login.healthSystem
-            
+    healthSystem = login.healthSystem
+    rejectedItems = login.rejectedItems
+ 
+# Access QR codes from Excel sheet of scanned items         
     def getQRCodes(dataPath, rowStart, rowEnd):
         #TODO Figure out which log recording is the one actually working
             if (rowStart <= rowFinal) and (rowStart <= rowEnd):
@@ -74,15 +76,24 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 for row in range(rowStart, rowEnd):
                     try:
                         qrcode = QRCodes[row].lower()
-                        goForward(url, qrcode, date, row)
+                        print(qrcode)
+                        if hasPassedInspection(qrcode):
+                            goForward(url, qrcode, date, row)
+                        else:
+                            print(qrcode + ' did not pass inspection.')
                     except AttributeError:
-                        print('AttributeError: it appears the code in row' + str(row) + ' may not actually be a code')
+                        print('AttributeError: it appears the code in row ' + str(row) + ' may not actually be a code')
             else:
                 print('all requested rows are complete')
                 successLog.append(['0', ', all requested rows are complete'])
             recordLogs()
+    def hasPassedInspection(code):
+        if code in rejectedItems:
+            return False
+        else:
+            return True
         
-
+# Look up the lead item webpage that corresponding to the input QR code.
     def goForward(url, code, date, row):
         try:
             print(code + ', going forward on row, ' + str(row))
@@ -102,7 +113,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             #getQRCodes(dataPath, row+1, rowFinal)
             errorLog.append([code, ', not found; timeout exception'])
             
-
+# Log into Website
     def login(url, user, pwd, f):
         driver.get(url+'account/login')
         #time.sleep(5)
@@ -112,9 +123,17 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
         elPwd = driver.find_element(By.ID, 'pw')
         elPwd.send_keys(pwd + Keys.RETURN)
         getQRCodes(dataPath, rowInitial, rowFinal)
+
+# Verify the lead item for that QR code is in inventory       
+    def checkProdInfo(product):
+        editBtn = driver.find_element(By.ID, 'btn_edit')
+        editBtn.click()
+        wait.until(EC.presence_of_element_located(By.className, 'editable-input'))
+        elCompany = driver.find_element_by_xpath('//span[@id, "company_id"]/following-sibling::span')
+        optCompany = elCompany.find_elements_by_tag_name('option').text
+        print(optCompany)
         
-            
-            
+# Read item details listed on the website          
     def createProdDict(code, row):
         prodDict = {}
         #print([driver.find_element(By.ID, 'id').get_attribute('innerHTML'), code, bool(driver.find_element(By.ID, 'id').get_attribute('innerHTML') == code)])
@@ -129,6 +148,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             prodDict['department'] = driver.find_element(By.ID, 'department_id').text or 'no department'
             prodDict['type'] = driver.find_element(By.ID, 'type_id').text or 'no type'
             successLog.append([code, ' found'])
+           # checkProdInfo(prodDict)
             
         else:
             print(code + ', not found by createProdDict')
@@ -137,6 +157,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
         prodList.append(prodDict)
         #return prodDict
 
+# Add new scan date on webpage for lead item
     def addScanDate(date, code):    
         try:
             dateTable = driver.find_element(By.ID, 'tbl_scan') or ''
@@ -160,6 +181,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             print(code + ', does not have a scan log')
             errorLog.append([code, ', does not have a scan log'])
     
+# Verify if new scan date has been added
     def checkScanDate(date, code):
         #time.sleep(1)
         #driver.find_element(By.ID, 'btn_scan_log').click()

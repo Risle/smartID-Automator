@@ -2,5 +2,5 @@
 login.py
 notes.txt
 test.py
-test2.py
 logs/
+__pycache__/
