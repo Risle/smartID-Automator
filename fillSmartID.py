@@ -16,17 +16,26 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
 import login
 from bs4 import BeautifulSoup
-
-#from getRowFromExcel import itemInfo
+import pymongo
 import pandas as pd
+import certifi
+import urllib3
 
-#from getRowFromExcel import getData
+#urllib3.contrib.pyopenssl.inject_into_urllib3()
+http = urllib3.PoolManager(
+    cert_reqs='CERT_REQUIRED',
+    ca_certs=certifi.where()
+    )
+
+#client = pymongo.MongoClient(login.conn_str, serverSelectionTimeoutMS=5000)
+
+
 
 chrome_options = Options()
 chrome_options.add_experimental_option("detach", True)
-
-#chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument("--incognito")
+
+
 
 global prodList
 prodList = []
@@ -36,6 +45,11 @@ global successLog
 successLog = []
 global datesScanned
 datesScanned = []
+
+try:
+    print(client.server_info())
+except Exception:
+    print("Unable to connect to the server.")
 
 def recordLogs():
     logs = {
@@ -93,6 +107,8 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             print('all requested rows are complete')
             successLog.append(['0', ', all requested rows are complete'])
         recordLogs()
+
+# Stop if items failed inspection
     def hasPassedInspection(code):
         if code in rejectedItems:
             return False
@@ -102,9 +118,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
 # Look up the lead item webpage that corresponding to the input QR code.
     def goForward(url, code, date, row):
         try:
-            print(code + ', going forward on row, ' + str(row))
-            webpage = driver.get(url+code)
-            
+            print(code + ', going forward on row ' + str(row))            
             expectedpage = wait.until(EC.presence_of_element_located((By.ID, 'id')))           
             if (expectedpage):
                 createProdDict(code, row)
@@ -114,11 +128,11 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 spans = driver.get_elements_by_tagname('span')
                 for span in spans:
                     print(span.text)
-                print(code + ', not found')
+                print(code + ' not found')
         except TimeoutException:
-            print(code + ', not found; timeout exception')
+            print(code + ' not found; timeout exception')
             #getQRCodes(dataPath, row+1, rowFinal)
-            errorLog.append([code, ', not found; timeout exception'])
+            errorLog.append([code, ' not found; timeout exception'])
             
 # Log into Website
     def login(url, user, pwd, f):
@@ -133,17 +147,18 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
 
 
 
-# Verify the lead item for that QR code is in inventory       
-    def inInventory(product):
-        editBtn = driver.find_element(By.ID, 'btn_edit')
-        editBtn.click()
-        print('editing item...')
-        
-        wait.until(EC.element_to_be_clickable(By.ID, 'company_id'))
-        #wait.until(EC.presence_of_element_located(By.className, 'editable-input'))
-        elCompany = driver.find_element_by_xpath('//span[@id, "company_id"]/following-sibling::span')
-        optCompany = elCompany.find_elements_by_tag_name('option').text
-        print(optCompany)
+# =============================================================================
+# # Verify the lead item for that QR code is in inventory       
+#     def inInventory(product):
+#         editBtn = driver.find_element(By.ID, 'btn_edit')
+#         editBtn.click()
+#         print('editing item...')
+#         wait.until(EC.element_to_be_clickable(By.ID, 'company_id'))
+#         #wait.until(EC.presence_of_element_located(By.className, 'editable-input'))
+#         elCompany = driver.find_element_by_xpath('//span[@id, "company_id"]/following-sibling::span')
+#         optCompany = elCompany.find_elements_by_tag_name('option').text
+#         print(optCompany)
+# =============================================================================
 
 # Filter elements by a specified class
     def match_class(target):                                                        
@@ -161,12 +176,17 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             if info == 'Health System':
                 addInfoHelper(login.healthSystem, info)
             elif info == 'Location':
-                addInfoHelper('Deaconess', info)
+                addInfoHelper('DEACONESS', info)
             elif info == 'Department':
-                addInfoHelper('CT', info)
+                addInfoHelper('CATH LAB', info)
                 
     def addInfoHelper(fixedInfo, IDToFix):
-        wait.until(EC.element_to_be_clickable(By.ID, IDToFix))
+        elToFix = wait.until(EC.element_to_be_clickable((By.ID, IDToFix))).click()
+        for option in elToFix.find_elements_by_tag_name('options'):
+            if option.text() == fixedInfo():
+                option.click()
+        elToFix.send_keys(Keys.RETURN)
+        print('made it')
         
 # Read item details listed on the website          
     def createProdDict(code, row):
@@ -174,8 +194,6 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
         prodDict = {}
         #print([driver.find_element(By.ID, 'id').get_attribute('innerHTML'), code, bool(driver.find_element(By.ID, 'id').get_attribute('innerHTML') == code)])
         print(driver.find_element(By.ID, 'id').text + ', found by createProdDict')
-        #print(driver.find_element(By.ID, 'id').value)
-        #print(driver.find_element(By.ID, 'id').get_property('attributes'))
         if code == driver.find_element(By.ID, 'id').get_attribute('innerHTML').lower():
             #allInfo1 = driver.find_element(By.ID, 'product-data')
             allInfo2 = soup.find(id='product-data')
@@ -189,31 +207,12 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                     print(text[0])
                     needsFixin.append(text[0])
                 else:
-                    print('needs fixin')
-            company = allInfo2.find(id='company_id')
-            print('got to company')
-                #print(string in child.parent.strings)
-                #if len(list((child.get_text()))) <= 1:
-                    #needsFixin.append(child.parent)
-                    #print(child.parent.parent.next_sibling.string)
-            #for child in allInfo2.find_all('li'):
-             #   print(str(child.span.attrs.keys))
-                #soup.find_all(span, attr={class_='required'}
-                #for child in elem.child:
-                #for reqInfo in (child.(class_='required')):
-                #print(child.class_.prettify())
-                    #print('no company')
-                # (child.find(id='location_id').text == ''):
-                 #   print('no location')
-                #elif (child.find(id='department_id').text == ''):
-                #    print('no dept')
-                #else:
-                #print (elem.prettify())
+                    print('all required info present')
+            #company = allInfo2.find(id='company_id')
+            #print('got to company')
             if len(needsFixin) > 0:
                 addRequiredInfo(code, row, needsFixin)
             return
-            #for info in allInfo.descendants:
-            #print(len(list(allInfo.descendants)))
             
 # =============================================================================
 #             prodDict['qrcode'] = code
