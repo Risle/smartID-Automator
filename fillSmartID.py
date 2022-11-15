@@ -75,12 +75,12 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
  
 # Access QR codes from Excel sheet of scanned items         
     def getQRCodes(dataPath, rowStart, rowEnd):
-        #TODO Figure out which log recording is the one actually working
         if (rowStart <= rowFinal) and (rowStart <= rowEnd):
             data = pd.read_excel (dataPath)
             #thisRow = data.iloc[row]
             QRCodes = data.values.T[4].tolist()
             for row in range(rowStart, rowEnd):
+                print(row)
                 try:
                     qrcode = QRCodes[row].lower()
                     print(qrcode)
@@ -90,10 +90,10 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                         print(qrcode + ' did not pass inspection.')
                 except AttributeError:
                     print('AttributeError: it appears the code in row ' + str(row) + ' may not actually be a code')
-                    return recordLogs()
-                except IndexError:
-                    print('IndexError: Remove empty row ' + str(row))
-                    return recordLogs()
+                    recordLogs()
+                # except IndexError:
+                #     print('IndexError: Remove empty row ' + str(row))
+                #     recordLogs()
         else:
             print('all requested rows are complete')
             successLog.append(['0', ', all requested rows are complete'])
@@ -113,7 +113,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             driver.get(url+code)
             expectedpage = wait.until(EC.presence_of_element_located((By.ID, 'id')))
             print('got to expected page')
-            print(str(expectedpage.text))
+            #print(str(expectedpage.text))
             if (expectedpage):
                 createProdDict(code, row)
                 addScanDate(date, code)  
@@ -204,12 +204,23 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 else:
                     print('no required info added for ' + info[0] + ' ' + info[1])
         except AttributeError:
-            print('No required info added')
+            print('AttributeError. No required info added')
         editBtn.click()
         print('ended fixins')
                 
-         
-        
+    def addToActiveInventory(code):
+        addBtn = driver.find_elements_by_id('btn_add_to_inv')
+        print('number of inventory buttons present = ' + str(len(addBtn)))
+        for btn in addBtn:
+            print(addBtn.text)
+        if addBtn:
+            addBtn[0].click()
+            print(code + ' added to inventory')
+        elif driver.find_elements_by_id('btn_remove_from_inv'):
+            print ('item already in inventory')
+        else:
+            print ('Inventory check failed for ' + code)
+
 # Read item details listed on the website          
     def createProdDict(code, row):
         soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -219,35 +230,31 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
         if code == driver.find_element(By.ID, 'id').get_attribute('innerHTML').lower():
             #allInfo1 = driver.find_element(By.ID, 'product-data')
             allInfo2 = soup.find(id='product-data')
-            #for elem in allInfo1.find_elements(By.TAG_NAME, 'li'):
             needsFixin = []
             for i, child in enumerate(allInfo2.find_all(match_class(['required']))):
                 text = []
                 for string in child.parent.parent.strings:
-                    print(string)
                     text.append(string)
-                if text[1] == '*':
+                if text[len(text)-1] == 'Not Selected':
                     print(text[0] + 'has no value')
                     needsFixin.append(text)
-                else:
-                    print(text[1] + ' is present')
-            #company = allInfo2.find(id='company_id')
-            #print('got to company')
+                # else:
+                #     print(text[len(text)-1] + ' is present')
+            # Add any missing required data
             if len(needsFixin) > 0:
                 addRequiredInfo(code, row, needsFixin)
             else:
                 print('all required info present')
-            
-# =============================================================================
-#             prodDict['qrcode'] = code
-#             prodDict['description'] = wait.until(EC.presence_of_element_located((By.ID, 'name'))).text or 'no description'
-#             prodDict['company'] = wait.until(EC.presence_of_element_located((By.ID, 'company_id'))).text or 'no company'
-#             prodDict['location'] = driver.find_element(By.ID, 'location_id').text or 'no location'
-#             prodDict['department'] = driver.find_element(By.ID, 'department_id').text or 'no department'
-#             prodDict['type'] = driver.find_element(By.ID, 'type_id').text or 'no type'
-#             successLog.append([code, ' found'])
-# =============================================================================
-           # checkProdInfo(prodDict)   
+            # Add to active inventory if not already
+            addToActiveInventory(code)
+            prodDict['qrcode'] = code
+            prodDict['description'] = wait.until(EC.presence_of_element_located((By.ID, 'name'))).text or 'no description'
+            prodDict['company'] = wait.until(EC.presence_of_element_located((By.ID, 'company_id'))).text or 'no company'
+            prodDict['location'] = driver.find_element(By.ID, 'location_id').text or 'no location'
+            prodDict['department'] = driver.find_element(By.ID, 'department_id').text or 'no department'
+            prodDict['type'] = driver.find_element(By.ID, 'type_id').text or 'no type'
+            successLog.append([code, ' found'])
+            # checkProdInfo(prodDict)   
         else:
             print(code + ', not found by createProdDict')
             #print(driver.wait.until(EC.presence_of_element_located((By.ID, 'id'))).text + ' was found instead')
@@ -257,19 +264,32 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
 
 # Add new scan date on webpage for lead item
     def addScanDate(date, code):    
+        print('adding new scan date for ' + code)
         try:
-            dateTable = driver.find_element(By.ID, 'tbl_scan') or ''
-            dateText = dateTable.find_element_by_css_selector('span.edit-scan-date').get_attribute('innerHTML') or ''
-            #dateFormat = '%Y-%m-%d'
-            if dateText >= date:
-                print(code + ', already has scan date recorded, ' + dateText)
-                successLog.append([code, ', already has scan date recorded for, ' + dateText])
-                datesScanned.append([code, ', already has recent scan recorded for, ' + dateText])
+            dateTable = driver.find_elements_by_id('tbl_scan')
+            #dateTable = driver.find_element(By.ID, 'tbl_scan') or ''
+            if len(dateTable) > 0:
+                dateText = dateTable[0].find_element_by_css_selector('span.edit-scan-date').get_attribute('innerHTML') or ''
+                #dateFormat = '%Y-%m-%d'
+                if dateText >= date:
+                    print(code + ', already has scan date recorded, ' + dateText)
+                    successLog.append([code, ', already has scan date recorded for, ' + dateText])
+                    datesScanned.append([code, ', already has recent scan recorded for, ' + dateText])
+                else:
+                    print('scan log is present. ' + code + ', is having scan date added')
+                    driver.find_element(By.ID, 'btn_scan_log').click()
+                    elDate = wait.until(EC.presence_of_element_located((By.ID, 'date')))
+                    elDate.click()
+                    elDate.clear()
+                    elDate.send_keys(date + Keys.ENTER)
+                    elDate.submit()
+                    #wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, 'Update Scan Results'))).click()
+                    checkScanDate(date, code)
             else:
                 print(code + ', is having scan date added')
                 driver.find_element(By.ID, 'btn_scan_log').click()
                 elDate = wait.until(EC.presence_of_element_located((By.ID, 'date')))
-                elDate.click()
+                #elDate.click()
                 elDate.clear()
                 elDate.send_keys(date + Keys.ENTER)
                 elDate.submit()
