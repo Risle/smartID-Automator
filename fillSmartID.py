@@ -14,6 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support.ui import Select
 import login
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -160,26 +161,54 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             return all(c in classes for c in target)                                
         return do_match 
 
+    def addInfoHelper(fixedInfo, IDToFix):
+        print('editing required info...')
+        try:
+            #elReq = driver.find_element_by_id(IDToFix).click()
+            #prodInfo = driver.find_element_by_id('product_data')
+            elReq = wait.until(EC.element_to_be_clickable((By.ID, IDToFix)))
+            elReq.click()
+            print('found edit button')
+            form = driver.find_element_by_tag_name('form')
+            select = Select(form.find_element_by_tag_name('select'))
+            select.select_by_visible_text(fixedInfo)
+            form.submit()
+            # for option in elReq.find_elements_by_tag_name('options'):
+            #     print (option.text())
+            #     if option.text() == fixedInfo:
+            #         option.click()
+            # elReq.send_keys(Keys.RETURN)
+            print('made it. Added ' + fixedInfo)
+        except AttributeError:
+            print('cant find edit button')   
+            
     def addRequiredInfo(code, row, toFix):
-        print('got to the final')
+        print('got to the fixin')
         editBtn = driver.find_element_by_id('btn_edit')
         editBtn.click()
-        for info in toFix:
-            print(info)
-            if info == 'Health System':
-                addInfoHelper(login.healthSystem, info)
-            elif info == 'Location':
-                addInfoHelper('DEACONESS', info)
-            elif info == 'Department':
-                addInfoHelper('CATH LAB', info)
+        try:
+            for info in toFix:
+                print(info[0] + ' has value of ' + info[1])
+                if info[0] == 'Health System':
+                    print('adding ' + healthSystem + '...')
+                    addInfoHelper(healthSystem, 'company_id')
+                    print('added ' + info[1])
+                elif info[0] == 'Location':
+                    print('adding' + 'DEACONESS...')
+                    addInfoHelper('DEACONESS HOSPITAL', 'location_id')
+                    print('added' + 'DEACONESS')
+                elif info[0] == 'Department':
+                    print('adding' + 'CATH LAB' + '...')
+                    addInfoHelper('CATH LAB', 'department_id')
+                    print('added' + 'CATH LAB')
+                else:
+                    print('no required info added for ' + info[0] + ' ' + info[1])
+        except AttributeError:
+            print('No required info added')
+        editBtn.click()
+        print('ended fixins')
                 
-    def addInfoHelper(fixedInfo, IDToFix):
-        elToFix = wait.until(EC.element_to_be_clickable((By.ID, IDToFix))).click()
-        for option in elToFix.find_elements_by_tag_name('options'):
-            if option.text() == fixedInfo():
-                option.click()
-        elToFix.send_keys(Keys.RETURN)
-        print('made it')
+         
         
 # Read item details listed on the website          
     def createProdDict(code, row):
@@ -192,15 +221,16 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             allInfo2 = soup.find(id='product-data')
             #for elem in allInfo1.find_elements(By.TAG_NAME, 'li'):
             needsFixin = []
-            for child in allInfo2.find_all(match_class(['required'])):
+            for i, child in enumerate(allInfo2.find_all(match_class(['required']))):
                 text = []
                 for string in child.parent.parent.strings:
+                    print(string)
                     text.append(string)
-                if len(text[len(text)-1]) < 1: # If required fields are complete
-                    print(text[0])
-                    needsFixin.append(text[0])
+                if text[1] == '*':
+                    print(text[0] + 'has no value')
+                    needsFixin.append(text)
                 else:
-                    print(text[0] + ' is present')
+                    print(text[1] + ' is present')
             #company = allInfo2.find(id='company_id')
             #print('got to company')
             if len(needsFixin) > 0:
