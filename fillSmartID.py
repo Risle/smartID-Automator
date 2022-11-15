@@ -17,24 +17,6 @@ from selenium.common.exceptions import TimeoutException
 import login
 import pandas as pd
 from bs4 import BeautifulSoup
-# =============================================================================
-# import pymongo
-# import certifi
-# import urllib3
-# 
-# #urllib3.contrib.pyopenssl.inject_into_urllib3()
-# http = urllib3.PoolManager(
-#     cert_reqs='CERT_REQUIRED',
-#     ca_certs=certifi.where()
-#     )
-# 
-# client = pymongo.MongoClient(
-#     login.conn_str, 
-#     serverSelectionTimeoutMS=5000,
-#     ssl=True,
-#     ssl_ca_certs=http)
-# 
-# =============================================================================
 
 
 chrome_options = Options()
@@ -127,7 +109,9 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     def goForward(url, code, date, row):
         try:
             print(code + ', going forward on row ' + str(row))
+            driver.get(url+code)
             expectedpage = wait.until(EC.presence_of_element_located((By.ID, 'id')))
+            print('got to expected page')
             print(str(expectedpage.text))
             if (expectedpage):
                 createProdDict(code, row)
@@ -202,7 +186,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         prodDict = {}
         #print([driver.find_element(By.ID, 'id').get_attribute('innerHTML'), code, bool(driver.find_element(By.ID, 'id').get_attribute('innerHTML') == code)])
-        print(driver.find_element(By.ID, 'id').text + ', found by createProdDict')
+        print(driver.find_element(By.ID, 'id').text + ' found by createProdDict')
         if code == driver.find_element(By.ID, 'id').get_attribute('innerHTML').lower():
             #allInfo1 = driver.find_element(By.ID, 'product-data')
             allInfo2 = soup.find(id='product-data')
@@ -212,16 +196,17 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 text = []
                 for string in child.parent.parent.strings:
                     text.append(string)
-                if len(text[len(text)-1]) > 1: # If required fields are complete
+                if len(text[len(text)-1]) < 1: # If required fields are complete
                     print(text[0])
                     needsFixin.append(text[0])
                 else:
-                    print('all required info present')
+                    print(text[0] + ' is present')
             #company = allInfo2.find(id='company_id')
             #print('got to company')
             if len(needsFixin) > 0:
                 addRequiredInfo(code, row, needsFixin)
-            return
+            else:
+                print('all required info present')
             
 # =============================================================================
 #             prodDict['qrcode'] = code
