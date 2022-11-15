@@ -15,20 +15,26 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
 import login
-from bs4 import BeautifulSoup
-import pymongo
 import pandas as pd
-import certifi
-import urllib3
-
-#urllib3.contrib.pyopenssl.inject_into_urllib3()
-http = urllib3.PoolManager(
-    cert_reqs='CERT_REQUIRED',
-    ca_certs=certifi.where()
-    )
-
-#client = pymongo.MongoClient(login.conn_str, serverSelectionTimeoutMS=5000)
-
+from bs4 import BeautifulSoup
+# =============================================================================
+# import pymongo
+# import certifi
+# import urllib3
+# 
+# #urllib3.contrib.pyopenssl.inject_into_urllib3()
+# http = urllib3.PoolManager(
+#     cert_reqs='CERT_REQUIRED',
+#     ca_certs=certifi.where()
+#     )
+# 
+# client = pymongo.MongoClient(
+#     login.conn_str, 
+#     serverSelectionTimeoutMS=5000,
+#     ssl=True,
+#     ssl_ca_certs=http)
+# 
+# =============================================================================
 
 
 chrome_options = Options()
@@ -46,10 +52,12 @@ successLog = []
 global datesScanned
 datesScanned = []
 
-try:
-    print(client.server_info())
-except Exception:
-    print("Unable to connect to the server.")
+# =============================================================================
+# try:
+#     print(client.server_info())
+# except Exception:
+#     print("Unable to connect to the server.")
+# =============================================================================
 
 def recordLogs():
     logs = {
@@ -118,8 +126,9 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
 # Look up the lead item webpage that corresponding to the input QR code.
     def goForward(url, code, date, row):
         try:
-            print(code + ', going forward on row ' + str(row))            
-            expectedpage = wait.until(EC.presence_of_element_located((By.ID, 'id')))           
+            print(code + ', going forward on row ' + str(row))
+            expectedpage = wait.until(EC.presence_of_element_located((By.ID, 'id')))
+            print(str(expectedpage.text))
             if (expectedpage):
                 createProdDict(code, row)
                 addScanDate(date, code)  
