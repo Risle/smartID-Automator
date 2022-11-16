@@ -9,6 +9,7 @@ import pymongo
 import pandas as pd
 import login
 
+
 client = pymongo.MongoClient('localhost', 27017)
 db = client['smartID']
 s = db['s2022']
@@ -23,6 +24,11 @@ prodList = logPath + 'productsFound.csv'
 rejectedItems = login.rejectedItems
 
 
+def qrCodesNotDone():
+    print('Need to record ' + str(s.count_documents({'scan_recorded': False})))
+    docs = [doc for doc in s.find({'scan_recorded': False})]
+    return docs
+        
 
 # Mark failed scan items (run once)
 def passedScan(coll, failList):
@@ -35,10 +41,6 @@ def notUnique(coll):
     cursors = coll.find({'scanned_QR': {'$exists': True}})
     for cursor in cursors:
         codes.append(cursor['scanned_QR'])
-    # #l = [item for item in cursors]
-    # for i, code in enumerate(codes):
-    #     if codes.count(code['scanned_QR']) > 1:
-    #         notUniq.append(doc)
     notUniq = [code for code in codes if codes.count(code) > 1]
     for code in notUniq:
         for doc in coll.find({'scanned_QR': code}):
@@ -80,6 +82,13 @@ def isRecorded(coll, qr, answer):
     if coll.find({'scanned_QR': qr}):
         coll.update_many({'scanned_QR': qr}, {'$set': {'recorded2022': answer}})
 
+# def recordLogToDB(log, bl, note):
+#     for i, record in enumerate(log):
+#         if bl == True:
+#             if record[1].__contains__(note):
+#                 alreadyRecorded = False
+#                 for item in recorded 
+
 def recordLog(log, bl):
     df = pd.read_csv(log) 
     logD = df.to_dict('records')
@@ -88,7 +97,7 @@ def recordLog(log, bl):
         #print(i, record)
         if bl == True:
             codeP = record['l4g0']
-            if record[' found'].__contains__('scan date'):
+            if record['has scan'].__contains__('has scan'):
                 alreadyRecorded = False
                 for item in recorded:
                     if item == {codeP: True}:
@@ -116,16 +125,18 @@ def recordLog(log, bl):
                     recorded.append({codeF: False})
     return recorded #array of {codeF, bool} if item has been recorded correctly in website
 
-def recordToDB(coll, log):
+# Note whether recording on the website has been successful
+def recordToDB(log):
     for item in log: 
         for key in item.keys():
             code = key.upper()
             print(code)
-        if coll.find_one({'$and':[{'scanned_QR': code}, {'scan_recorded': {'$nin': [True]}}]}):
+        if s.find_one({'$and':[{'scanned_QR': code}, {'scan_recorded': {'$nin': [True]}}]}):
             print('found ' + code)
-            coll.update_one({ 'scanned_QR' : code}, {'$set': {'scan_recorded': item[key]}})
+            s.update_one({ 'scanned_QR' : code}, {'$set': {'scan_recorded': item[key]}})
     
-recordToDB(s, recordLog(successLog, True))
+
+recordToDB(recordLog(successLog, True))
 #passedScan(s, rejectedItems)
 #print(s.find_one({'scanned_QR':'L4G0'}))
 #recordLog(successLog, True)
