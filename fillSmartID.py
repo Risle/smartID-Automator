@@ -70,7 +70,8 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     rowInitial = login.rows[0]-2
     rowFinal = login.rows[1]
     date = login.date
-    healthSystem = login.healthSystem
+    healthSystem = login.HealthSystem
+    location = login.Hospital
     rejectedItems = login.rejectedItems
  
 # Access QR codes from Excel sheet of scanned items         
@@ -79,21 +80,23 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             data = pd.read_excel (dataPath)
             #thisRow = data.iloc[row]
             QRCodes = data.values.T[4].tolist()
+            DEPT = data.values.T[2].tolist()
             for row in range(rowStart, rowEnd):
                 print(row)
                 try:
                     qrcode = QRCodes[row].lower()
+                    dept = DEPT[row].upper()
                     print(qrcode)
                     if hasPassedInspection(qrcode):
-                        goForward(url, qrcode, date, row)
+                        goForward(url, qrcode, date, row, dept)
                     else:
                         print(qrcode + ' did not pass inspection.')
                 except AttributeError:
                     print('AttributeError: it appears the code in row ' + str(row) + ' may not actually be a code')
                     recordLogs()
-                # except IndexError:
-                #     print('IndexError: Remove empty row ' + str(row))
-                #     recordLogs()
+                except IndexError:
+                    print('IndexError: Remove empty row ' + str(row))
+                    recordLogs()
         else:
             print('all requested rows are complete')
             successLog.append(['0', ', all requested rows are complete'])
@@ -107,7 +110,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             return True
         
 # Look up the lead item webpage that corresponding to the input QR code.
-    def goForward(url, code, date, row):
+    def goForward(url, code, date, row, dept):
         try:
             print(code + ', going forward on row ' + str(row))
             driver.get(url+code)
@@ -115,7 +118,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             print('got to expected page')
             #print(str(expectedpage.text))
             if (expectedpage):
-                createProdDict(code, row)
+                createProdDict(code, row, dept)
                 addScanDate(date, code)  
                 print (code + ', matches url')
             else:
@@ -182,7 +185,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
         except AttributeError:
             print('cant find edit button')   
             
-    def addRequiredInfo(code, row, toFix):
+    def addRequiredInfo(code, row, toFix, dept):
         print('got to the fixin')
         editBtn = driver.find_element_by_id('btn_edit')
         editBtn.click()
@@ -194,13 +197,13 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                     addInfoHelper(healthSystem, 'company_id')
                     print('added ' + info[1])
                 elif info[0] == 'Location':
-                    print('adding' + 'DEACONESS...')
-                    addInfoHelper('DEACONESS HOSPITAL', 'location_id')
-                    print('added' + 'DEACONESS')
+                    print('adding' + location)
+                    addInfoHelper(location, 'location_id')
+                    print('added' + location)
                 elif info[0] == 'Department':
-                    print('adding' + 'CATH LAB' + '...')
-                    addInfoHelper('CATH LAB', 'department_id')
-                    print('added' + 'CATH LAB')
+                    print('adding' + dept + '...')
+                    addInfoHelper(dept, 'department_id')
+                    print('added' + dept)
                 else:
                     print('no required info added for ' + info[0] + ' ' + info[1])
         except AttributeError:
@@ -209,20 +212,20 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
         print('ended fixins')
                 
     def addToActiveInventory(code):
-        addBtn = driver.find_elements_by_id('btn_add_to_inv')
-        print('number of inventory buttons present = ' + str(len(addBtn)))
-        for btn in addBtn:
-            print(addBtn.text)
-        if addBtn:
-            addBtn[0].click()
-            print(code + ' added to inventory')
-        elif driver.find_elements_by_id('btn_remove_from_inv'):
-            print ('item already in inventory')
-        else:
-            print ('Inventory check failed for ' + code)
+        btns = driver.find_elements_by_class_name('ui-controlgroup-controls')
+        isInInventory = False
+        for btn in btns:
+            if btn.text.__contains__('Add to Active Inventory'):
+                btn.click()
+                print(code + ' added to inventory')
+                isInInventory = True
+            elif btn.text.__contains__('Remove'):
+                print(code + ' already in active inventory')
+                isInInventory = True
+        print(code + ' is in inventory? ' + str(isInInventory))
 
 # Read item details listed on the website          
-    def createProdDict(code, row):
+    def createProdDict(code, row, dept):
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         prodDict = {}
         #print([driver.find_element(By.ID, 'id').get_attribute('innerHTML'), code, bool(driver.find_element(By.ID, 'id').get_attribute('innerHTML') == code)])
@@ -242,7 +245,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 #     print(text[len(text)-1] + ' is present')
             # Add any missing required data
             if len(needsFixin) > 0:
-                addRequiredInfo(code, row, needsFixin)
+                addRequiredInfo(code, row, needsFixin, dept)
             else:
                 print('all required info present')
             # Add to active inventory if not already
