@@ -19,12 +19,9 @@ import login
 import pandas as pd
 from bs4 import BeautifulSoup
 
-
 chrome_options = Options()
 chrome_options.add_experimental_option("detach", True)
 chrome_options.add_argument("--incognito")
-
-
 
 global prodList
 prodList = []
@@ -34,13 +31,6 @@ global successLog
 successLog = []
 global datesScanned
 datesScanned = []
-
-# =============================================================================
-# try:
-#     print(client.server_info())
-# except Exception:
-#     print("Unable to connect to the server.")
-# =============================================================================
 
 def recordLogs():
     logs = {
@@ -53,14 +43,10 @@ def recordLogs():
         if log == prodList:
             df = pd.DataFrame.from_dict(prodList)
         else:
-            #TODO fix prodList log
             df = pd.DataFrame(log, columns=['QR code', 'message'])
         df['Time'] = str(pd.Timestamp.now())
         df.to_csv('/home/poff/Projects/Technology/python/2021AutomateWeb/smartid/logs/' + filename, mode='a', header=False)   
         
-
-#This example requires Selenium WebDriver 3.13 or newer
-# =============================================================================
 with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     wait = WebDriverWait(driver, 3)
     url = login.url
@@ -78,7 +64,6 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     def getQRCodes(dataPath, rowStart, rowEnd):
         if (rowStart <= rowFinal) and (rowStart <= rowEnd):
             data = pd.read_excel (dataPath)
-            #thisRow = data.iloc[row]
             QRCodes = data.values.T[4].tolist()
             DEPT = data.values.T[2].tolist()
             for row in range(rowStart, rowEnd):
@@ -116,7 +101,6 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             driver.get(url+code)
             expectedpage = wait.until(EC.presence_of_element_located((By.ID, 'id')))
             print('got to expected page')
-            #print(str(expectedpage.text))
             if (expectedpage):
                 createProdDict(code, row, dept)
                 addScanDate(date, code)  
@@ -128,34 +112,17 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 print(code + ' not found')
         except TimeoutException:
             print(code + ' not found; timeout exception')
-            #getQRCodes(dataPath, row+1, rowFinal)
             errorLog.append([code, ' not found; timeout exception'])
             
 # Log into Website
     def login(url, user, pwd, f):
         driver.get(url+'account/login')
-        #time.sleep(5)
         elUsername = wait.until(EC.presence_of_element_located((By.ID, 'un')))
         elUsername.clear()
         elUsername.send_keys(user)
         elPwd = driver.find_element(By.ID, 'pw')
         elPwd.send_keys(pwd + Keys.RETURN)
         getQRCodes(dataPath, rowInitial, rowFinal)
-
-
-
-# =============================================================================
-# # Verify the lead item for that QR code is in inventory       
-#     def inInventory(product):
-#         editBtn = driver.find_element(By.ID, 'btn_edit')
-#         editBtn.click()
-#         print('editing item...')
-#         wait.until(EC.element_to_be_clickable(By.ID, 'company_id'))
-#         #wait.until(EC.presence_of_element_located(By.className, 'editable-input'))
-#         elCompany = driver.find_element_by_xpath('//span[@id, "company_id"]/following-sibling::span')
-#         optCompany = elCompany.find_elements_by_tag_name('option').text
-#         print(optCompany)
-# =============================================================================
 
 # Filter elements by a specified class
     def match_class(target):                                                        
@@ -167,8 +134,6 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     def addInfoHelper(fixedInfo, IDToFix):
         print('editing required info...')
         try:
-            #elReq = driver.find_element_by_id(IDToFix).click()
-            #prodInfo = driver.find_element_by_id('product_data')
             elReq = wait.until(EC.element_to_be_clickable((By.ID, IDToFix)))
             elReq.click()
             print('found edit button')
@@ -176,11 +141,6 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             select = Select(form.find_element_by_tag_name('select'))
             select.select_by_visible_text(fixedInfo)
             form.submit()
-            # for option in elReq.find_elements_by_tag_name('options'):
-            #     print (option.text())
-            #     if option.text() == fixedInfo:
-            #         option.click()
-            # elReq.send_keys(Keys.RETURN)
             print('made it. Added ' + fixedInfo)
         except AttributeError:
             print('cant find edit button')   
@@ -224,14 +184,12 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 isInInventory = True
         print(code + ' is in inventory? ' + str(isInInventory))
 
-# Read item details listed on the website          
+# Fix any missing required info and read item details listed on the website          
     def createProdDict(code, row, dept):
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         prodDict = {}
-        #print([driver.find_element(By.ID, 'id').get_attribute('innerHTML'), code, bool(driver.find_element(By.ID, 'id').get_attribute('innerHTML') == code)])
         print(driver.find_element(By.ID, 'id').text + ' found by createProdDict')
         if code == driver.find_element(By.ID, 'id').get_attribute('innerHTML').lower():
-            #allInfo1 = driver.find_element(By.ID, 'product-data')
             allInfo2 = soup.find(id='product-data')
             needsFixin = []
             for i, child in enumerate(allInfo2.find_all(match_class(['required']))):
@@ -241,39 +199,33 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                 if text[len(text)-1] == 'Not Selected':
                     print(text[0] + 'has no value')
                     needsFixin.append(text)
-                # else:
-                #     print(text[len(text)-1] + ' is present')
-            # Add any missing required data
             if len(needsFixin) > 0:
                 addRequiredInfo(code, row, needsFixin, dept)
             else:
                 print('all required info present')
             # Add to active inventory if not already
             addToActiveInventory(code)
+            # Log details for completed items
             prodDict['qrcode'] = code
             prodDict['description'] = wait.until(EC.presence_of_element_located((By.ID, 'name'))).text or 'no description'
             prodDict['company'] = wait.until(EC.presence_of_element_located((By.ID, 'company_id'))).text or 'no company'
             prodDict['location'] = driver.find_element(By.ID, 'location_id').text or 'no location'
             prodDict['department'] = driver.find_element(By.ID, 'department_id').text or 'no department'
             prodDict['type'] = driver.find_element(By.ID, 'type_id').text or 'no type'
-            successLog.append([code, ' found'])
-            # checkProdInfo(prodDict)   
+            successLog.append([code, ' found'])   
         else:
             print(code + ', not found by createProdDict')
-            #print(driver.wait.until(EC.presence_of_element_located((By.ID, 'id'))).text + ' was found instead')
             errorLog.append([code, ', not found'])
         prodList.append(prodDict)
-        #return prodDict
 
 # Add new scan date on webpage for lead item
     def addScanDate(date, code):    
         print('adding new scan date for ' + code)
         try:
             dateTable = driver.find_elements_by_id('tbl_scan')
-            #dateTable = driver.find_element(By.ID, 'tbl_scan') or ''
             if len(dateTable) > 0:
                 dateText = dateTable[0].find_element_by_css_selector('span.edit-scan-date').get_attribute('innerHTML') or ''
-                #dateFormat = '%Y-%m-%d'
+                # dateFormat = '%Y-%m-%d'
                 if dateText >= date:
                     print(code + ', already has scan date recorded, ' + dateText)
                     successLog.append([code, ', already has scan date recorded for, ' + dateText])
@@ -286,17 +238,14 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
                     elDate.clear()
                     elDate.send_keys(date + Keys.ENTER)
                     elDate.submit()
-                    #wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, 'Update Scan Results'))).click()
                     checkScanDate(date, code)
             else:
                 print(code + ', is having scan date added')
                 driver.find_element(By.ID, 'btn_scan_log').click()
                 elDate = wait.until(EC.presence_of_element_located((By.ID, 'date')))
-                #elDate.click()
                 elDate.clear()
                 elDate.send_keys(date + Keys.ENTER)
                 elDate.submit()
-                #wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, 'Update Scan Results'))).click()
                 checkScanDate(date, code)
         except NoSuchElementException:
             print(code + ', does not have a scan log')
@@ -304,23 +253,8 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     
 # Verify if new scan date has been added
     def checkScanDate(date, code):
-        #time.sleep(1)
-        #driver.find_element(By.ID, 'btn_scan_log').click()
-        #wait.until(EC.visibility_of_element_located((By.ID, 'btn_scan_log'))).click()
         dateTable = driver.find_element(By.ID, 'tbl_scan') or ''
         dateText = dateTable.find_element_by_css_selector('span.edit-scan-date').get_attribute('innerHTML')
-        #dateText = elScanDate.get_attribute('innerHTML')
-        # scanDates = []
-        # for elDate in elScanDates:
-        #     dateText = elDate.get_attribute('innerHTML')
-        #     #print(elDate.tag_name)
-        #     #print(elDate.text)
-        #     #print(elDate.get_attribute('value'))
-        #     print(elDate.get_attribute('innerHTML'))
-        #     #print(elDate.get_attribute('outerHTML'))
-        #     #print(elDate.get_property('attributes'))
-        #     #print(date)
-        #     scanDates.append(elDate.get_attribute('innerHTML'))
         if dateText >= date:
             print(code + ', new scan date, ' + dateText + ' added')
             successLog.append([code, ', has new scan date recorded, ' + dateText])
@@ -335,11 +269,5 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
     login(url, user, pwd, goForward) 
     recordLogs()
 
-        
-
-# print(prodList)    
-# print(errorLog)  
-# print(successLog) 
-# print(datesScanned)
         
     
