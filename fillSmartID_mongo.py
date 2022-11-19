@@ -43,11 +43,13 @@ datesScanned = []
 def recordLogs():
     # for success in successLog:
     #     if success[2].__contains__('has scan'):
-    success = []
-    for item in successLog:
-        if item[1].__contains__('scan date'):
-            success.append({item[0], item[1]})
-    recordToDB(success)
+    if len(successLog) > 0:
+        success = []
+        for item in successLog:
+            print(item)
+            if str(item[1]).__contains__('scan date'):
+                success.append({str(item[0]): True})
+        recordToDB(success)
     logs = {
         'productsFound.csv': prodList,
         'errorLog.csv': errorLog,
@@ -96,7 +98,7 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
 
 # Stop if items failed inspection
     def hasPassedInspection(code):
-        if code in rejectedItems:
+        if code.upper() in rejectedItems:
             return False
         else:
             return True
@@ -123,13 +125,18 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             
 # Log into Website
     def login(url, user, pwd, f):
-        driver.get(url+'account/login')
-        elUsername = wait.until(EC.presence_of_element_located((By.ID, 'un')))
-        elUsername.clear()
-        elUsername.send_keys(user)
-        elPwd = driver.find_element(By.ID, 'pw')
-        elPwd.send_keys(pwd + Keys.RETURN)
-        getQRCodes(qrCodesNotDone())
+        try:
+            driver.get(url+'account/login')
+            elUsername = wait.until(EC.presence_of_element_located((By.ID, 'un')))
+            elUsername.clear()
+            elUsername.send_keys(user)
+            elPwd = driver.find_element(By.ID, 'pw')
+            elPwd.send_keys(pwd + Keys.RETURN)
+            getQRCodes(qrCodesNotDone())
+        except KeyboardInterrupt:
+            print('you stopped this')
+            recordLogs()
+            
 
 # Filter elements by a specified class
     def match_class(target):                                                        
@@ -138,21 +145,27 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             return all(c in classes for c in target)                                
         return do_match 
 
-    def addInfoHelper(fixedInfo, IDToFix):
+    def addInfoHelper(fixedInfo, IDToFix, code, elem):
         print('editing required info...')
         try:
             elReq = wait.until(EC.element_to_be_clickable((By.ID, IDToFix)))
             elReq.click()
             print('found edit button')
-            form = driver.find_element_by_tag_name('form')
+            #el = elem.wait.until(EC.presence_of_element_located(By.TAG_NAME, 'strong'))
+            #driver.find_elements_by_tag_name('strong')
+            form = wait.until(EC.element_to_be_clickable(By.TAG_NAME, 'form'))
+               # elem.find_element_by_tag_name('form'))
+            #driver.find_element_by_tag_name('form')
             select = Select(form.find_element_by_tag_name('select'))
-            wait
-            #wait.until(EC.element_located_to_be_selected())
-            select.select_by_visible_text(fixedInfo)
+            wait.until(EC.presence_of_element_located((By.ID, IDToFix)))
+            select.select_by_value()
             form.submit()
             print('made it. Added ' + fixedInfo)
         except AttributeError:
             print('cant find edit button')   
+        except NoSuchElementException:
+            print('info for ' + code + 'not found')
+            errorLog.append([code, 'could not add required info'])
             
     def addRequiredInfo(code, row, toFix, dept):
         print('got to the fixin')
@@ -160,18 +173,21 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
         editBtn.click()
         try:
             for info in toFix:
-                print(info[0] + ' has value of ' + info[1])
-                if info[0] == 'Health System':
+                field = info[1][0]
+                entry = info[1][1]
+                elem = info[0]
+                print(field + ' has value of ' + entry)
+                if field == 'Health System':
                     print('adding ' + healthSystem + '...')
-                    addInfoHelper(healthSystem, 'company_id')
-                    print('added ' + info[1])
-                elif info[0] == 'Location':
+                    addInfoHelper(healthSystem, 'company_id', code, elem)
+                    print('added ' + entry)
+                elif field == 'Location':
                     print('adding' + location)
-                    addInfoHelper(location, 'location_id')
+                    addInfoHelper(location, 'location_id', code, elem)
                     print('added' + location)
-                elif info[0] == 'Department':
+                elif field == 'Department':
                     print('adding' + dept + '...')
-                    addInfoHelper(dept, 'department_id')
+                    addInfoHelper(dept, 'department_id', code, elem)
                     print('added' + dept)
                 else:
                     print('no required info added for ' + info[0] + ' ' + info[1])
@@ -203,11 +219,12 @@ with webdriver.Chrome(ChromeDriverManager().install()) as driver:
             needsFixin = []
             for i, child in enumerate(allInfo2.find_all(match_class(['required']))):
                 text = []
-                for string in child.parent.parent.strings:
+                li = child.parent.parent
+                for string in li.strings:
                     text.append(string)
                 if text[len(text)-1] == 'Not Selected':
                     print(text[0] + 'has no value')
-                    needsFixin.append(text)
+                    needsFixin.append([li, text])
             if len(needsFixin) > 0:
                 addRequiredInfo(code, row, needsFixin, dept)
             else:

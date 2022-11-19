@@ -27,6 +27,7 @@ rejectedItems = login.rejectedItems
 def qrCodesNotDone():
     print('Need to record ' + str(s.count_documents({'scan_recorded': False})))
     docs = [doc for doc in s.find({'scan_recorded': False})]
+    print(len(docs))
     return docs
         
 
@@ -96,47 +97,53 @@ def recordLog(log, bl):
     for i, record in enumerate(logD):
         #print(i, record)
         if bl == True:
-            codeP = record['l4g0']
-            if record['has scan'].__contains__('has scan'):
+            codeP = record['QR Code']
+            if record['Note'].__contains__('scan date'):
                 alreadyRecorded = False
-                for item in recorded:
-                    if item == {codeP: True}:
-                        alreadyRecorded = True
-                        print(str(i) + ': ' + 'success already recorded for ' + codeP)
-                    elif item == {codeP: False}:
-                        alreadyRecorded = True
-                        item = {codeP: True}
-                        print('new success for ' + codeP)
+                if len(recorded) > 0:
+                    for item in recorded:
+                        if item == {codeP: True}:
+                            alreadyRecorded = True
+                            print(str(i) + ': ' + 'success already recorded for ' + codeP)
+                        elif item == {codeP: False}:
+                            alreadyRecorded = True
+                            item = {codeP: True}
+                            print('new success for ' + codeP)
                 if not alreadyRecorded:
                     recorded.append({codeP: True})
                     print(str(i) + ': ' + codeP + ' is now recorded')
         elif bl == False:
-            codeF = record['zwdr']
-            if record[', does not have a scan log'].__contains__('not'):
+            codeF = record['QR Code']
+            if record['Note'].__contains__('not'):
                 alreadyRecorded = False
                 if len(recorded) > 0:
                     for item in recorded:
-                        print(item)
                         if item == codeF:
                             alreadyRecorded = True
                             print(str(i) + ': ' + codeF + 'already recorded as ' + str(recorded[item]))
                 if not alreadyRecorded:
                     #print(str(i) + ': ' + codeF + ' has not been successfully recorded')
                     recorded.append({codeF: False})
-    return recorded #array of {codeF, bool} if item has been recorded correctly in website
+    if len(recorded) > 0:
+        return recordToDB(recorded) #array of {codeF, bool} if item has been recorded correctly in website
+    else:
+        print('no changes to recordings')
+        return
 
 # Note whether recording on the website has been successful
 def recordToDB(log):
     for item in log: 
+        print(item)
         for key in item.keys():
             code = key.upper()
             print(code)
         if s.find_one({'$and':[{'scanned_QR': code}, {'scan_recorded': {'$nin': [True]}}]}):
             print('found ' + code)
             s.update_one({ 'scanned_QR' : code}, {'$set': {'scan_recorded': item[key]}})
+            print(s.find_one({ 'scanned_QR' : code}))
     
 
-recordToDB(recordLog(successLog, True))
+#recordToDB(recordLog(successLog, True))
 #passedScan(s, rejectedItems)
 #print(s.find_one({'scanned_QR':'L4G0'}))
 #recordLog(successLog, True)
